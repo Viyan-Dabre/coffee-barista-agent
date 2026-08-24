@@ -14,7 +14,8 @@ def load_menu():
 
 def search_menu(query: str, max_results: int = 5):
     """
-    Retrieve relevant menu items using weighted keyword matching.
+    Retrieve relevant menu items using weighted keyword matching
+    with hard dietary/allergen filtering.
     """
 
     menu = load_menu()
@@ -22,6 +23,22 @@ def search_menu(query: str, max_results: int = 5):
 
     query_words = set(
         re.findall(r"\b[a-zA-Z]+\b", query_lower)
+    )
+
+    # Detect explicit dietary restrictions.
+    dairy_free_request = (
+        "dairy-free" in query_lower
+        or "dairy free" in query_lower
+        or "no dairy" in query_lower
+        or "without dairy" in query_lower
+        or "dairy allergy" in query_lower
+        or "allergic to dairy" in query_lower
+    )
+
+    vegan_request = (
+        "vegan" in query_lower
+        or "plant-based" in query_lower
+        or "plant based" in query_lower
     )
 
     results = []
@@ -35,13 +52,22 @@ def search_menu(query: str, max_results: int = 5):
             for allergen in item.get("allergens", [])
         ]
 
+        # Hard dietary filters.
+        if dairy_free_request:
+            if "dairy" in allergens or "dairy-free" not in tags:
+                continue
+
+        if vegan_request:
+            if "vegan" not in tags:
+                continue
+
         score = 0
 
-        # Exact product-name match
+        # Exact product-name match.
         if name in query_lower:
             score += 10
 
-        # Preference/tag matches
+        # Preference/tag matches.
         matched_tags = 0
 
         for word in query_words:
@@ -54,7 +80,7 @@ def search_menu(query: str, max_results: int = 5):
         if matched_tags >= 2:
             score += 8
 
-        # Product-name word matches
+        # Product-name word matches.
         name_words = set(
             re.findall(r"\b[a-zA-Z]+\b", name)
         )
@@ -63,15 +89,10 @@ def search_menu(query: str, max_results: int = 5):
             if word in name_words:
                 score += 4
 
-        # Description matches
+        # Description matches.
         for word in query_words:
             if word in description:
                 score += 1
-
-        # Allergen matches
-        for word in query_words:
-            if word in allergens:
-                score += 2
 
         if score > 0:
             results.append(
